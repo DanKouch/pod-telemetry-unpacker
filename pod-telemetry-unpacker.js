@@ -6,6 +6,7 @@ const xml2js = require('xml2js')
 const fs = require('fs');
 
 let fields;
+let structure;
 
 const sizeOf = {
     "int": 4,
@@ -57,7 +58,6 @@ module.exports.unpack = (packet) => {
     }
     
     data.packetNumber = packet["readUInt32BE"](3);
-    
     let arrayValues = [];
 
     if(fields === undefined)
@@ -90,7 +90,18 @@ module.exports.unpack = (packet) => {
         }
     })
 
-    return data;
+    return mapFieldDictionaryToStructure(data, structure);
+}
+
+function mapFieldDictionaryToStructure(fields, structure){
+    for(a in structure){
+        if(structure[a] == null){
+            structure[a] = fields[a]
+        }else{
+            mapFieldDictionaryToStructure(fields, structure[a])
+        }
+    }
+    return structure;
 }
 
 module.exports.loadXML = (filepath, callback) => {
@@ -129,6 +140,11 @@ module.exports.loadXML = (filepath, callback) => {
             })
 
             fields = f;
+
+            // Generate the heirerarchical structure each individual field is placed onto
+            structure = generateStructure(json["struct"]);
+
+
             callback()
         })
     })
@@ -149,4 +165,27 @@ function searchForNodesWithName(obj, name, out){
     }
     return out
     
+}
+
+function generateStructure(json){
+    let obj = {}
+    for (let prop in json){
+        if(prop == "$") continue;
+        if(prop == "field"){
+            json[prop].forEach(field => {
+                obj[field.$.id] = null;
+            })
+        }
+        else if (prop == "struct"){
+            if(Array.isArray(json[prop]))
+                json[prop].forEach((structure, i) => {
+                    obj[structure.$.id] = generateStructure(json[prop][i]);
+                })
+            else
+                obj[json[prop].$.id] = generateStructure(json[prop]);
+
+        }
+                 
+    }
+    return obj;
 }

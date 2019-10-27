@@ -15,7 +15,8 @@ server.on('error', (err) => {
 
 // Prints out first packet then quits
 server.on('message', (msg, rinfo) => {
-	console.log(JSON.stringify(unpacker.unpack(msg), function(key, value){
+	let unpackedPacket = unpacker.unpack(msg)
+	console.log(JSON.stringify(unpackedPacket, function(key, value){
 		// Allows bignumbers to be printed
 		return (typeof value === 'bigint') ? value.toString() : value;
 	}, 4));
