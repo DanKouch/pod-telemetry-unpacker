@@ -1,13 +1,16 @@
-const HEADER = 0xBAD6E4
-const endian = "LITTLE"
-
 const CRC32 = require('crc-32')
 const xml2js = require('xml2js')
 const fs = require('fs');
 
+// Defines the endianness of the buffer read operations
+const endian = "BE" // BE (big endian) or LE (little endian)
+
+// Dictionary of information about each field
 let fields;
+// A tree structure of the data
 let structure;
 
+// Maps data types to byte lengths
 const sizeOf = {
     "int": 4,
     "double": 8,
@@ -23,41 +26,58 @@ const sizeOf = {
     "bool": 1,
 }
 
+// Maps data types to NodeJS Buffer conversion methods
 const bufferConversion = {
-    "int": "readInt32BE",
-    "double": "readDoubleBE",
-    "float": "readFloatBE",
+    "int": "readInt32" + endian,
+    "double": "readDouble" + endian,
+    "float": "readFloat" + endian,
     "uint8_t": "readUInt8",
-    "uint16_t": "readUInt16BE",
-    "uint32_t": "readUInt32BE",
-    "uint64_t": "readBigUInt64BE",
+    "uint16_t": "readUInt16" + endian,
+    "uint32_t": "readUInt32" + endian,
+    "uint64_t": "readBigUInt64" + endian,
     "int8_t": "readInt8",
-    "int16_t": "readInt16BE",
-    "int32_t": "readInt32BE",
-    "int64_t": "readBigInt64BE",
+    "int16_t": "readInt16" + endian,
+    "int32_t": "readInt32" + endian,
+    "int64_t": "readBigInt64" + endian,
     "bool": "readUInt8",
 }
 
-function verifyHeader(){
-    return module.packet.readUIntBE(0, 3) == HEADER;
+/**
+ * Checks whether or not the header of a packet is correct.
+ * If the header is not correct, the packet is dropped.
+ * @param {Buffer} packet The packet to be checked
+ */
+module.exports.verifyHeader = (packet) => {
+    return packet["readUInt" + endian](0, 3) == 0xBAD6E4;
 }
 
-function verifyCRC32(){
-    dataOnlyBuffer = module.packet.slice(0, module.packet.length - 4)
-    return (CRC32.buf(dataOnlyBuffer)) ==  module.packet.readInt32BE(module.packet.length - 4);
+/**
+ * Checks whether or not the CRC32 included in the packet is correct.
+ * The CRC32 in this case acts as a checksum. If they do not match,
+ * the packet is dropped.
+ * @param {Buffer} packet The packet to be checked
+ */
+module.exports.verifyCRC32 = (packet) => {
+    dataOnlyBuffer = packet.slice(0, packet.length - 4)
+    return (CRC32.buf(dataOnlyBuffer)) ==  packet["readInt32" + endian](packet.length - 4);
 }
 
+/**
+ * Unpacks a buffer into a data structure mirroring that
+ * of data.h in the pod-embedded code.
+ * @param {buffer} packet The binary data to be unpacked
+ */
 module.exports.unpack = (packet) => {
     module.packet = packet;
     let data = {};
 
     // Drop the packet if the header does not match HEADER or if the CRC32 is incorrect
-    if(!verifyHeader() || !verifyCRC32()){
+    if(!(module.exports.verifyHeader(packet) && module.exports.verifyCRC32(packet))){
         console.warn("Dropped packet")
         return null;
     }
     
-    data.packetNumber = packet["readUInt32BE"](3);
+    data.packetNumber = packet["readUInt32" + endian](3);
     let arrayValues = [];
 
     if(fields === undefined)
@@ -93,17 +113,11 @@ module.exports.unpack = (packet) => {
     return mapFieldDictionaryToStructure(data, structure);
 }
 
-function mapFieldDictionaryToStructure(fields, structure){
-    for(a in structure){
-        if(structure[a] == null){
-            structure[a] = fields[a]
-        }else{
-            mapFieldDictionaryToStructure(fields, structure[a])
-        }
-    }
-    return structure;
-}
-
+/**
+ * Loads a XML structure and sets up each field for unpacking
+ * @param filepath The filepath of the xml file to be loaded
+ * @param callback Called when the function has completed
+ */
 module.exports.loadXML = (filepath, callback) => {
     fs.readFile(filepath, (err, data) => {
         if(err != undefined)
@@ -150,6 +164,11 @@ module.exports.loadXML = (filepath, callback) => {
     })
 }
 
+/**
+ * Recurrsively searches a given javascript object
+ * looking for, and returning, elements with a given
+ * name
+ */
 function searchForNodesWithName(obj, name, out){
     if(out === undefined)
         out = []
@@ -167,6 +186,25 @@ function searchForNodesWithName(obj, name, out){
     
 }
 
+/**
+ * Recurrsively maps the fields and structures of an xml2js
+ * json object to reflect the data.h data structure in the
+ * pod-embedded code. All fields are set to null. The
+ * individual fields of the structure are intended to be
+ * assigned later.
+ * 
+ * Example output:
+ * 
+ * data: {
+ *      someStructure: {
+ *          someFieldA: null,
+ *          someFieldB: null
+ *      }
+ *      someFieldC: null
+ * }
+ * 
+ * @param json The xml2js json structure to be mapped to a tree
+ */
 function generateStructure(json){
     let obj = {}
     for (let prop in json){
@@ -183,9 +221,25 @@ function generateStructure(json){
                 })
             else
                 obj[json[prop].$.id] = generateStructure(json[prop]);
-
         }
-                 
     }
     return obj;
+}
+
+/**
+ * Recursively loops through a tree structure generated by
+ * the generateStructure method above and assigns the
+ * variables based on a flat structure (a dictionary)
+ * @param fields The flat structure/dictionary which contains all of the fields to be mapped
+ * @param structure The tree structure the fields should be mapped to
+ */
+function mapFieldDictionaryToStructure(fields, structure){
+    for(a in structure){
+        if(structure[a] == null){
+            structure[a] = fields[a]
+        }else{
+            mapFieldDictionaryToStructure(fields, structure[a])
+        }
+    }
+    return structure;
 }
