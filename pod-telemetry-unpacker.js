@@ -3,7 +3,7 @@ const xml2js = require('xml2js')
 const fs = require('fs');
 
 // Defines the endianness of the buffer read operations
-let endian = "BE" // BE (big endian) or LE (little endian)
+let endian = "LE" // BE (big endian) or LE (little endian)
 
 // Dictionary of information about each field
 let fields;
@@ -94,7 +94,6 @@ module.exports.unpack = (packet) => {
         return null;
     }
     
-    data.packetNumber = packet["readUInt32" + endian](3);
     let arrayValues = [];
 
     if(fields === undefined)
@@ -127,7 +126,10 @@ module.exports.unpack = (packet) => {
         }
     })
 
-    return mapFieldDictionaryToStructure(data, structure);
+    let mappedStructure = mapFieldDictionaryToStructure(data, structure);
+    mappedStructure.packetNumber = packet["readUInt32" + endian](3)
+
+    return mappedStructure;
 }
 
 /**
