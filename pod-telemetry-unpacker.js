@@ -3,7 +3,7 @@ const xml2js = require('xml2js')
 const fs = require('fs');
 
 // Defines the endianness of the buffer read operations
-const endian = "BE" // BE (big endian) or LE (little endian)
+let endian = "BE" // BE (big endian) or LE (little endian)
 
 // Dictionary of information about each field
 let fields;
@@ -41,6 +41,23 @@ const bufferConversion = {
     "int64_t": "readBigInt64" + endian,
     "bool": "readUInt8",
 }
+
+/**
+ * Sets the endianness of the Buffer read operations.
+ * Endianness defaults to big endianness.
+ * @param {string} endianness "BE" for big endian, "LE" for little endian
+ */
+module.exports.setEndianness = (endianness) => {
+    if(endianness != "BE" && endianness != "LE")
+        throw new Exception("Invalid endianness; Should be 'BE' or 'LE'.")
+    endian = endianness;
+}
+
+/**
+ * Retreives the endianness used by the buffer read operations.
+ * @returns 'BE' for big endian or 'LE' for litle endian
+ */
+module.exports.getEndianness = () => endian;
 
 /**
  * Checks whether or not the header of a packet is correct.
