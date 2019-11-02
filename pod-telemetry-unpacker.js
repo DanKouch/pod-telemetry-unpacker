@@ -99,7 +99,7 @@ module.exports.unpack = (packet) => {
     if(fields === undefined)
         console.warn("The XML has not been loaded.");
     else {
-        let current = 7
+        let current = 24
         
         fields.forEach((field) => {
             // If the field has an index (is part of an array), register it as an array
@@ -127,7 +127,18 @@ module.exports.unpack = (packet) => {
     })
 
     let mappedStructure = mapFieldDictionaryToStructure(data, structure);
+    
+    // Add everything sent by the telemetry packet not stored in data.h
     mappedStructure.packetNumber = packet["readUInt32" + endian](3)
+    mappedStructure.time = packet["readBigUInt64" + endian](7)
+
+    if(!mappedStructure.hasOwnProperty("bms")) mappedStructure.bms = {};
+    mappedStructure.bms.imdStatus = packet["readUInt8"](15)
+
+    if(!mappedStructure.hasOwnProperty("pressure")) mappedStructure.pressure = {};
+    mappedStructure.pressure.primBrake = packet["readInt32" + endian](16)
+    mappedStructure.pressure.secBrake = packet["readInt32" + endian](20)
+
 
     return mappedStructure;
 }
