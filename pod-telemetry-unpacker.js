@@ -90,16 +90,14 @@ module.exports.unpack = (packet) => {
 
     // Drop the packet if the header does not match HEADER or if the CRC32 is incorrect
     if(!(module.exports.verifyHeader(packet) && module.exports.verifyCRC32(packet))){
-        console.warn("Dropped packet")
         return null;
     }
     
-    let arrayValues = [];
-
     if(fields === undefined)
-        console.warn("The XML has not been loaded.");
+        throw new Exception("The data XML file has not yet been loaded!")
     else {
         let current = 24
+        let arrayValues = [];
         
         fields.forEach((field) => {
             // If the field has an index (is part of an array), register it as an array
@@ -108,23 +106,23 @@ module.exports.unpack = (packet) => {
             data[field.id + (field.index != undefined ? "[" + field.index + "]" : "")] = packet[field.converter](current)
             current += field.size;
         })
+
+	    // Deal with bools
+	    fields.filter(f => f.type == "bool").forEach(f => {
+	        data[f.id] = data[f.id] == 1 ? true : false
+	    })
+
+	    // Reassemble arrays
+	    arrayValues.forEach(id => {
+	        data[id] = [];
+	        for(let prop in data){
+	            if(prop.startsWith(id + "[")){
+	                data[id].push(data[prop])
+	                delete data[prop]
+	            }
+	        }
+	    })
     }
-
-    // Deal with bools
-    fields.filter(f => f.type == "bool").forEach(f => {
-        data[f.id] = data[f.id] == 1 ? true : false
-    })
-
-    // Reassemble arrays
-    arrayValues.forEach(id => {
-        data[id] = [];
-        for(let prop in data){
-            if(prop.startsWith(id + "[")){
-                data[id].push(data[prop])
-                delete data[prop]
-            }
-        }
-    })
 
     let mappedStructure = mapFieldDictionaryToStructure(data, structure);
     
@@ -264,6 +262,7 @@ function generateStructure(json){
  * @param structure The tree structure the fields should be mapped to
  */
 function mapFieldDictionaryToStructure(fields, structure){
+	if(structure == undefined) return {};
     for(a in structure){
         if(structure[a] == null){
             structure[a] = fields[a]

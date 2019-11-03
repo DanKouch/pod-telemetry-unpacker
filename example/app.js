@@ -3,24 +3,27 @@ const unpacker = require("./../pod-telemetry-unpacker.js");
 const dgram = require('dgram');
 const server = dgram.createSocket('udp4');
 
-unpacker.loadXML(__dirname + "/data.xml", (err) => {
-	if(err)
-		throw err;
-});
-
 server.on('error', (err) => {
 	console.log("Server error: " + err);
 	server.close();
 });
 
 // Prints out first packet then quits
-server.on('message', (msg, rinfo) => {
-	let unpackedPacket = unpacker.unpack(msg)
-	console.log(JSON.stringify(unpackedPacket, function(key, value){
-		// Allows bignumbers to be printed
-		return (typeof value === 'bigint') ? value.toString() : value;
-	}, 4));
-	process.exit(0);
+unpacker.loadXML(__dirname + "/data.xml", (err) => {
+	if(err)
+		throw err;
+	server.on('message', (msg, rinfo) => {
+		let unpackedPacket = unpacker.unpack(msg)
+		if(unpackedPacket == null){
+			console.log("A packet was dropped.")
+			return;
+		}
+		console.log(JSON.stringify(unpackedPacket, (key, value) => {
+			// Allows bignumbers to be printed
+			return (typeof value === 'bigint') ? value.toString() : value;
+		}, 4));
+		process.exit(0);
+	});
 });
 
 server.on('listening', () => {
