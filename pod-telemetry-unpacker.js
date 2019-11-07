@@ -1,6 +1,7 @@
 const CRC32 = require('crc-32')
 const xml2js = require('xml2js')
 const fs = require('fs');
+const MathJS = require("mathjs")
 
 // Defines the endianness of the buffer read operations
 let endian = "LE" // BE (big endian) or LE (little endian)
@@ -271,4 +272,49 @@ function mapFieldDictionaryToStructure(fields, structure){
         }
     }
     return structure;
+}
+
+
+/**
+** NODE.JS < 12 LTS WORKARROUND
+**/
+
+// Create the readBigUInt64BE function if Node.js version is < 12 LTS
+if(!Buffer.prototype.hasOwnProperty("readBigUInt64BE")){
+	Object.defineProperty(Buffer.prototype, "readBigUInt64BE", { value: function readBigUInt64BE(offset) {
+	    let firstHalf = this["readUInt32BE"](offset);
+		let secondHalf = this["readUInt32BE"](offset + 4);
+
+		return MathJS.evaluate((firstHalf) + "*(2^(32)) + " + (secondHalf));
+	}});
+}
+
+// Create the readBigUInt64LE function if Node.js version is < 12 LTS
+if(!Buffer.prototype.hasOwnProperty("readBigUInt64LE")){
+	Object.defineProperty(Buffer.prototype, "readBigUInt64LE", { value: function readBigUInt64LE(offset) {
+	    let firstHalf = this["readUInt32LE"](offset);
+		let secondHalf = this["readUInt32LE"](offset + 4);
+
+    	return MathJS.evaluate((firstHalf) + " + (2^(32))*" + (secondHalf));
+	}});
+}
+
+// Create the readBigInt64BE function if Node.js version is < 12 LTS
+if(!Buffer.prototype.hasOwnProperty("readBigInt64BE")){
+	Object.defineProperty(Buffer.prototype, "readBigInt64BE", { value: function readBigInt64BE(offset) {
+	    let firstHalf = this["readInt32BE"](offset);
+		let secondHalf = this["readInt32BE"](offset + 4);
+
+		return MathJS.evaluate((firstHalf) + "*(2^(32)) + " + (secondHalf));
+	}});
+}
+
+// Create the readBigInt64LE function if Node.js version is < 12 LTS
+if(!Buffer.prototype.hasOwnProperty("readBigInt64LE")){
+	Object.defineProperty(Buffer.prototype, "readBigInt64LE", { value: function readBigInt64LE(offset) {
+	    let firstHalf = this["readInt32LE"](offset);
+		let secondHalf = this["readInt32LE"](offset + 4);
+
+    	return MathJS.evaluate((firstHalf) + " + (2^(32))*" + (secondHalf));
+	}});
 }
